@@ -7,15 +7,37 @@ const VisitorGate = ({ onSubmit }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (firstName.trim() && lastName.trim()) {
-      const visitorData = {
-        firstName,
-        lastName,
-        timestamp: new Date().toISOString(),
-        id: Date.now()
-      };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (firstName.trim() && lastName.trim()) {
+    const visitorData = {
+      firstName,
+      lastName,
+      timestamp: new Date().toISOString(),
+      id: Date.now()
+    };
+    
+    // Отправляем на сервер через API
+    try {
+      const response = await fetch('/api/visitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(visitorData)
+      });
+      
+      if (response.ok) {
+        onSubmit(visitorData);
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения:', error);
+      // Запасной вариант - сохраняем в localStorage
+      const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
+      visitors.push(visitorData);
+      localStorage.setItem('visitors', JSON.stringify(visitors));
+      onSubmit(visitorData);
+    }
+  }
+};
       
       // Сохраняем в localStorage
       const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
@@ -97,18 +119,17 @@ const AdminPanel = ({ isOpen, onClose }) => {
   
   const ADMIN_PASSWORD = "admin123"; // Ваш пароль
   
-  const loadVisitors = () => {
-    // Загружаем реальных посетителей из localStorage
-    const storedVisitors = JSON.parse(localStorage.getItem('visitors') || '[]');
-    
-    // Фейковые данные для примера (можно убрать)
-    const fakeVisitors = [
-      { id: 999, firstName: 'Тест', lastName: 'Тестов', timestamp: new Date().toISOString() }
-    ];
-    
-    // Показываем только реальных посетителей (без фейковых)
-    setVisitors(storedVisitors);
-  };
+  // НОВЫЙ КОД (вставь вместо старого)
+const loadVisitors = async () => {
+  try {
+    const response = await fetch('/api/visitors');
+    const data = await response.json();
+    setVisitors(data);
+  } catch (error) {
+    console.error('Ошибка загрузки:', error);
+    setVisitors([]);
+  }
+};
   
   const clearLog = () => {
     if (confirm('⚠️ Вы уверены, что хотите очистить весь лог посетителей? Это действие нельзя отменить.')) {
@@ -119,15 +140,15 @@ const AdminPanel = ({ isOpen, onClose }) => {
   };
   
   const checkPassword = () => {
-    if (password === ADMIN_PASSWORD) {
-      setHasAccess(true);
-      setPasswordError(false);
-      loadVisitors();
-    } else {
-      setPasswordError(true);
-      setTimeout(() => setPasswordError(false), 2000);
-    }
-  };
+  if (password === ADMIN_PASSWORD) {
+    setHasAccess(true);
+    setPasswordError(false);
+    loadVisitors();  // ← здесь вызывается loadVisitors
+  } else {
+    setPasswordError(true);
+    setTimeout(() => setPasswordError(false), 2000);
+  }
+};
   
   useEffect(() => {
     if (isOpen) {
