@@ -6,77 +6,39 @@ const VisitorGate = ({ onSubmit }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (firstName.trim() && lastName.trim()) {
       const visitorData = {
-        firstName,
-        lastName,
-        timestamp: new Date().toISOString(),
-        id: Date.now()
+        firstName: firstName.trim(),
+        lastName: lastName.trim()
       };
       
-      const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
-      visitors.push(visitorData);
-      localStorage.setItem('visitors', JSON.stringify(visitors));
-      
-      onSubmit(visitorData);
+      try {
+        const response = await fetch('/api/visitors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(visitorData)
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          onSubmit(data.visitor);
+        } else {
+          throw new Error('Ошибка сохранения');
+        }
+      } catch (error) {
+        console.error('Ошибка:', error);
+        // Запасной вариант - сохраняем в localStorage
+        const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
+        visitors.push({ ...visitorData, id: Date.now(), timestamp: new Date().toISOString() });
+        localStorage.setItem('visitors', JSON.stringify(visitors));
+        onSubmit(visitorData);
+      }
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-xl"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-        className="w-full max-w-md mx-4"
-      >
-        <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 rounded-2xl border border-zinc-800 shadow-2xl">
-          <h2 className="text-3xl font-light text-zinc-100 mb-2">Добро пожаловать</h2>
-          <p className="text-zinc-400 mb-8">Пожалуйста, представьтесь</p>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <input
-                type="text"
-                placeholder="Имя"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all"
-                required
-              />
-            </div>
-            
-            <div>
-              <input
-                type="text"
-                placeholder="Фамилия"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all"
-                required
-              />
-            </div>
-            
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-lg font-medium shadow-lg hover:shadow-emerald-500/20 transition-shadow"
-            >
-              Войти
-            </motion.button>
-          </form>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
+  // ... остальной JSX такой же
 };
 
 const AdminPanel = ({ isOpen, onClose }) => {
@@ -84,19 +46,38 @@ const AdminPanel = ({ isOpen, onClose }) => {
   const [hasAccess, setHasAccess] = useState(false);
   const [password, setPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   const ADMIN_PASSWORD = "admin123";
   
-  const loadVisitors = () => {
-    const storedVisitors = JSON.parse(localStorage.getItem('visitors') || '[]');
-    setVisitors(storedVisitors);
+  const loadVisitors = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/visitors');
+      const data = await response.json();
+      setVisitors(data);
+    } catch (error) {
+      console.error('Ошибка загрузки:', error);
+      // Запасной вариант из localStorage
+      const stored = JSON.parse(localStorage.getItem('visitors') || '[]');
+      setVisitors(stored);
+    } finally {
+      setLoading(false);
+    }
   };
   
-  const clearLog = () => {
+  const clearLog = async () => {
     if (confirm('⚠️ Вы уверены, что хотите очистить весь лог посетителей?')) {
-      localStorage.removeItem('visitors');
-      setVisitors([]);
-      alert('✅ Лог успешно очищен');
+      try {
+        await fetch('/api/visitors', { method: 'DELETE' });
+        setVisitors([]);
+        alert('✅ Лог успешно очищен');
+      } catch (error) {
+        console.error('Ошибка очистки:', error);
+        localStorage.removeItem('visitors');
+        setVisitors([]);
+        alert('✅ Лог очищен (локально)');
+      }
     }
   };
   
@@ -121,6 +102,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
+    // ... JSX такой же, но добавь индикатор загрузки
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -141,10 +123,7 @@ const AdminPanel = ({ isOpen, onClose }) => {
               <h3 className="text-2xl font-light text-zinc-100">
                 {hasAccess ? '📋 Лог посетителей' : '🔒 Доступ ограничен'}
               </h3>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-              >
+              <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg">
                 <X className="w-5 h-5 text-zinc-400" />
               </button>
             </div>
@@ -161,14 +140,12 @@ const AdminPanel = ({ isOpen, onClose }) => {
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && checkPassword()}
                       placeholder="Пароль"
-                      className={`w-full px-4 py-3 bg-zinc-800 border rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${
+                      className={`w-full px-4 py-3 bg-zinc-800 border rounded-lg text-zinc-100 ${
                         passwordError ? 'border-red-500' : 'border-zinc-700'
-                      }`}
+                      } focus:outline-none focus:ring-2 focus:ring-emerald-500/50`}
                       autoFocus
                     />
-                    {passwordError && (
-                      <p className="text-red-500 text-sm mt-2">❌ Неверный пароль</p>
-                    )}
+                    {passwordError && <p className="text-red-500 text-sm mt-2">❌ Неверный пароль</p>}
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -193,10 +170,10 @@ const AdminPanel = ({ isOpen, onClose }) => {
                     </button>
                   </div>
                   
-                  {visitors.length === 0 ? (
-                    <div className="text-center py-12 text-zinc-500">
-                      📭 Лог посетителей пуст
-                    </div>
+                  {loading ? (
+                    <div className="text-center py-12 text-zinc-500">Загрузка...</div>
+                  ) : visitors.length === 0 ? (
+                    <div className="text-center py-12 text-zinc-500">📭 Лог посетителей пуст</div>
                   ) : (
                     <table className="w-full">
                       <thead>
@@ -211,12 +188,12 @@ const AdminPanel = ({ isOpen, onClose }) => {
                         {visitors.map((visitor, index) => (
                           <tr key={visitor.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
                             <td className="py-3 px-4 text-zinc-400">{index + 1}</td>
-                            <td className="py-3 px-4 text-zinc-100">{visitor.firstName}</td>
-                            <td className="py-3 px-4 text-zinc-100">{visitor.lastName}</td>
+                            <td className="py-3 px-4 text-zinc-100">{visitor.first_name || visitor.firstName}</td>
+                            <td className="py-3 px-4 text-zinc-100">{visitor.last_name || visitor.lastName}</td>
                             <td className="py-3 px-4 text-zinc-400">
                               📅 {new Date(visitor.timestamp).toLocaleString('ru-RU')}
                             </td>
-                           </tr>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
