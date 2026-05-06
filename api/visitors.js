@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import { kv } from '@vercel/kv';
 
 export default async function handler(req, res) {
   // Разрешаем CORS
@@ -11,50 +11,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Создаем таблицу если не существует
-    await sql`
-      CREATE TABLE IF NOT EXISTS visitors (
-        id SERIAL PRIMARY KEY,
-        first_name VARCHAR(100) NOT NULL,
-        last_name VARCHAR(100) NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
+    // GET - получить всех посетителей
+    if (req.method === 'GET') {
+      const visitors = await kv.lrange('visitors', 0, -1);
+      const parsed = visitors.map(v => JSON.parse(v));
+      return res.status(200).json(parsed.reverse());
+    }
 
+    // POST - добавить посетителя
     if (req.method === 'POST') {
-      // Добавление нового посетителя
       const { firstName, lastName } = req.body;
       
-      const result = await sql`
-        INSERT INTO visitors (first_name, last_name)
-        VALUES (${firstName}, ${lastName})
-        RETURNING *
-      `;
-      
-      return res.status(200).json({ success: true, visitor: result.rows[0] });
+      const visitor = {
+        id: Date.now(),
+        firstName,
+        lastName,
+        timestamp: new Date().toISOString(),
+      };
+
+      await kv.lpush('visitors', JSON.stringify(visitor));
+      return res.status(201).json({ visitor, success: true });
     }
-    
-    else if (req.method === 'GET') {
-      // Получение всех посетителей
-      const result = await sql`
-        SELECT * FROM visitors 
-        ORDER BY timestamp DESC
-      `;
-      
-      return res.status(200).json(result.rows);
+
+    // DELETE - очистить лог
+    if (req.method === 'DELETE') {
+      await kv.del('visitors');
+      return res.status(200).json({ success: true, message: 'Лог очищен' });
     }
-    
-    else if (req.method === 'DELETE') {
-      // Очистка всей таблицы
-      await sql`DELETE FROM visitors`;
-      return res.status(200).json({ success: true });
-    }
-    
-    else {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('Database error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('API Error:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 }

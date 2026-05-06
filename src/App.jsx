@@ -29,16 +29,65 @@ const VisitorGate = ({ onSubmit }) => {
         }
       } catch (error) {
         console.error('Ошибка:', error);
-        // Запасной вариант - сохраняем в localStorage
-        const visitors = JSON.parse(localStorage.getItem('visitors') || '[]');
-        visitors.push({ ...visitorData, id: Date.now(), timestamp: new Date().toISOString() });
-        localStorage.setItem('visitors', JSON.stringify(visitors));
+        // Запасной вариант - всё равно пускаем на сайт
         onSubmit(visitorData);
       }
     }
   };
 
-  // ... остальной JSX такой же
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/90 backdrop-blur-xl"
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+        className="w-full max-w-md mx-4"
+      >
+        <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 p-8 rounded-2xl border border-zinc-800 shadow-2xl">
+          <h2 className="text-3xl font-light text-zinc-100 mb-2">Добро пожаловать</h2>
+          <p className="text-zinc-400 mb-8">Пожалуйста, представьтесь</p>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <input
+                type="text"
+                placeholder="Имя"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all"
+                required
+              />
+            </div>
+            
+            <div>
+              <input
+                type="text"
+                placeholder="Фамилия"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-transparent transition-all"
+                required
+              />
+            </div>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-lg font-medium shadow-lg hover:shadow-emerald-500/20 transition-shadow"
+            >
+              Войти
+            </motion.button>
+          </form>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 };
 
 const AdminPanel = ({ isOpen, onClose }) => {
